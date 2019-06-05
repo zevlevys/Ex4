@@ -1,7 +1,9 @@
 #include "VirtualMemory.h"
 #include "PhysicalMemory.h"
 
-int VMreadIn(uint64_t pageNumber, uint64_t offset, int depth);
+int traverse(uint64_t virtualAddress);
+
+uint64_t getPageNumber(uint64_t address);
 
 void clearTable(uint64_t frameIndex) {
     for (uint64_t i = 0; i < PAGE_SIZE; ++i) {
@@ -17,15 +19,15 @@ uint64_t getXthBatch(uint64_t address, uint64_t batchNumber) {
     return (address >> batchNumber * OFFSET_WIDTH) % PAGE_SIZE;
 }
 
-int VMread(uint64_t virtualAddress, word_t *value) {
-    return 1;
+uint64_t getPageNumber(uint64_t address) {
+    return address >> OFFSET_WIDTH;
 }
 
-int traverse(uint64_t virtualAddress, word_t *value) {
+int traverse(uint64_t virtualAddress) {
     uint64_t pageNumber = getPageNumber(virtualAddress);
     uint64_t address = 0;
     uint64_t old_address;
-    for (int i = TABLES_DEPTH; i > 0; i--) {
+    for (int i = TABLES_DEPTH; i >= 0; i--) {
         old_address = address;
         uint64_t sub = getXthBatch(virtualAddress, i);
         PMread(address * PAGE_SIZE + sub, (word_t *) &address);
@@ -80,14 +82,13 @@ int traverse(uint64_t virtualAddress, word_t *value) {
 
 
 int VMwrite(uint64_t virtualAddress, word_t value) {
-    //traverse tree TREE_DEPTH times, each time do:
-    //translate part of the offset: PMread(addr*page_size + x, addr)
-    //if(addr == 0) then
-    //Find an unused frame or evict a page from some frame. Suppose this frame number is f
-    //Clear it if it is table
-    //PMwrite(0+x, f)
-    //addr = f
-    //PMwrite(addr * page_size + x, value)
+    uint64_t frame_address = traverse(virtualAddress);
+    PMwrite(frame_address, value);
+    return 1;
+}
 
+int VMread(uint64_t virtualAddress, word_t *value) {
+    uint64_t frame_address = traverse(virtualAddress);
+    PMread(frame_address, value);
     return 1;
 }
