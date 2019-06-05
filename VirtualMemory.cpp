@@ -6,6 +6,13 @@ typedef struct{
     uint64_t first;
     uint64_t second;
 } uint_pair;
+typedef struct{
+    uint64_t first;
+    uint64_t second;
+    uint64_t third;
+} uint_triple;
+
+
 
 void clearTable(uint64_t frameIndex) {
     for (uint64_t i = 0; i < PAGE_SIZE; ++i) {
@@ -83,13 +90,14 @@ uint64_t cycDistance(uint64_t page, uint64_t page_to_swap_in){
 }
 
 
-uint_pair chooseEvicted(uint64_t pageToSwapIn, uint64_t frameIndex, int depth, int page_number){
+uint_triple chooseEvicted(uint64_t pageToSwapIn, uint64_t frameIndex, int depth, int page_number){
     //reached leaf
     if (depth >= TABLES_DEPTH){
-        uint_pair pair;
-        pair.first = page_number;
-        pair.second = cycDistance(page_number, pageToSwapIn)
-        return pair;
+        uint_triple triple;
+        triple.first = page_number;
+        triple.second = cycDistance(page_number, pageToSwapIn);
+        triple.third = frameIndex;
+        return triple;
     }
     uint64_t maxCycDistance= 0;
     for (uint64_t j = 0; j < PAGE_SIZE; j++){
@@ -97,15 +105,37 @@ uint_pair chooseEvicted(uint64_t pageToSwapIn, uint64_t frameIndex, int depth, i
         PMread(frameIndex + j, &nextTable);
         if ((uint64_t)nextTable != 0) {
             //todo: check this calculation of the page offset concat
-            uint_pair ret;
+            uint_triple ret;
             ret =  chooseEvicted(pageToSwapIn, nextTable, depth+1, concatInts(j, page_number, OFFSET_WIDTH * (depth+1)));
             maxCycDistance = fmaxl(ret.second, maxCycDistance);
         }
     }
-    uint_pair final;
+    uint_triple final;
     final.first = page_number;
     final.second = maxCycDistance;
+    final.third = frameIndex;
     return final;
+}
+
+
+uint_pair chooseEvictedWrapper(uint64_t _pageToSwap){
+    uint_triple evict_ret = chooseEvicted(_pageToSwap, 0, 0, 0);
+    uint_pair final;
+    final.first = evict_ret.first;
+    final.second = evict_ret.third;
+    return final;
+}
+
+
+uint64_t chooseFrame(uint64_t pageToSwap, uint64_t){
+    uint64_t usableFrame = findUsableFrameWrapper();
+    if (usableFrame != 0){
+        return usableFrame;
+    }
+    uint_pair evictionCandidate = chooseEvictedWrapper(pageToSwap);
+    //todo: make sure we don't anything we want for this page/table
+    PMevict(evictionCandidate.second, evictionCandidate.first);
+    return evictionCandidate.second;
 }
 
 
